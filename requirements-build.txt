@@ -1,0 +1,2 @@
+# Optional Windows executable build tools. Install runtime requirements first.
+PyInstaller==6.20.0

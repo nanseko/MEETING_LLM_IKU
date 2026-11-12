@@ -1,0 +1,12 @@
+# Optional dependencies for Settings > Speaker-Diarization.
+# Install these only when speaker diarization is needed.
+
+pyannote.audio==3.3.0
+pyannote.core==5.0.0
+pyannote.database==5.1.0
+pyannote.metrics==3.2.1
+pyannote.pipeline==3.0.1
+torch==2.3.1
+torchaudio==2.3.1
+numpy<2
+setuptools<81

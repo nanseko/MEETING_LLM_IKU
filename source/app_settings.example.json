@@ -1,0 +1,9 @@
+{
+  "api_url": "",
+  "api_model": "",
+  "api_key": "",
+  "stt_model": "small",
+  "speaker_diarization": false,
+  "recording_dir": "uploads",
+  "secure_business": false
+}

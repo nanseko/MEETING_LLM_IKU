@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>회의록 초안 생성 서버</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="brand">회의록 <span>LLM</span></div>
+      <nav class="nav" aria-label="주 메뉴">
+        <a class="nav-item {% if page == 'home' %}active{% endif %}" href="{{ url_for('index') }}"><span class="nav-icon">H</span>홈</a>
+        <a class="nav-item {% if page == 'history' %}active{% endif %}" href="{{ url_for('history') }}"><span class="nav-icon clock"></span>변환 기록</a>
+        <a class="nav-item" href="#"><span class="nav-icon">D</span>회의록 초안 목록</a>
+        <a class="nav-item {% if page == 'settings' %}active{% endif %}" href="{{ url_for('settings') }}"><span class="nav-icon">S</span>설정</a>
+      </nav>
+      <div class="sidebar-footer">
+        <div>로컬 회의록 생성 도구</div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar"></header>
+      <section class="content">
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <div class="flash-list">
+              {% for message in messages %}
+                <div class="message">{{ message }}</div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+
+        {% if page == 'settings' %}
+          <section class="settings-header">
+            <h1 class="page-title">설정</h1>
+            <p class="page-subtitle">서비스 이용에 필요한 기본 설정을 관리할 수 있습니다.</p>
+          </section>
+
+          <form method="post" action="{{ url_for('settings') }}">
+            <section class="settings-card">
+              <div class="settings-row">
+                <div class="settings-icon">A</div>
+                <div>
+                  <p class="settings-title">API 설정</p>
+                  <p class="settings-desc">회의록 생성에 사용할 LLM API URL, 모델명, API 키를 입력하세요.</p>
+                </div>
+                <div class="settings-control api-settings-control">
+                  <input class="settings-input" name="api_url" type="url" value="{{ settings.api_url }}" placeholder="API URL">
+                  <input class="settings-input" name="api_model" value="{{ settings.api_model }}" placeholder="MODEL">
+                  <input class="settings-input" name="api_key" type="password" value="{{ settings.api_key }}" placeholder="API KEY">
+                </div>
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-icon">M</div>
+                <div>
+                  <p class="settings-title">STT Model 선택</p>
+                  <p class="settings-desc">회의 음성을 분석할 faster-whisper 모델을 선택하세요.</p>
+                </div>
+                <div class="settings-control">
+                  <select class="settings-select" name="stt_model">
+                    <option value="tiny" {% if settings.stt_model == 'tiny' %}selected{% endif %}>tiny - 가장 빠름</option>
+                    <option value="base" {% if settings.stt_model == 'base' %}selected{% endif %}>base - 빠름</option>
+                    <option value="small" {% if settings.stt_model == 'small' %}selected{% endif %}>small - 권장</option>
+                    <option value="medium" {% if settings.stt_model == 'medium' %}selected{% endif %}>medium - 정확도 우선</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-icon">P</div>
+                <div>
+                  <p class="settings-title">Speaker-Diarization</p>
+                  <p class="settings-desc">화자 분리를 활성화하여 회의 참여자별로 구분합니다.</p>
+                </div>
+                <div class="settings-control">
+                  <label class="toggle">
+                    <input name="speaker_diarization" type="checkbox" {% if settings.speaker_diarization %}checked{% endif %}>
+                    <span class="toggle-label">ON</span>
+                    <span class="toggle-knob"></span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-icon">F</div>
+                <div>
+                  <p class="settings-title">기본 녹음 저장 위치 설정</p>
+                  <p class="settings-desc">회의 녹음 파일이 임시로 저장될 기본 폴더 경로를 설정하세요.</p>
+                </div>
+                <div class="settings-control">
+                  <input id="recording-dir" class="settings-input path-input" name="recording_dir" value="{{ settings.recording_dir }}" placeholder="저장 경로를 입력하세요">
+                  <button id="browse-path" class="browse-button" type="button">찾아보기</button>
+                </div>
+              </div>
+            </section>
+            <div class="save-row">
+              <button class="save-button" type="submit">저장</button>
+            </div>
+          </form>
+        {% elif page == 'history' %}
+          <section class="history-header">
+            <h1 class="page-title">변환 기록</h1>
+            <p class="page-subtitle">음성 파일 변환 및 회의록 초안 생성 이력을 확인할 수 있습니다.</p>
+          </section>
+
+          <form class="filter-panel" method="get" action="{{ url_for('history') }}">
+            <input class="field" name="q" value="{{ filters.q }}" placeholder="회의 제목 검색">
+            <input class="field" name="start" type="date" value="{{ filters.start }}">
+            <span class="date-separator">~</span>
+            <input class="field" name="end" type="date" value="{{ filters.end }}">
+            <select class="field" name="user">
+              <option value="">전체 사용자</option>
+              {% for user_id in user_ids %}
+                <option value="{{ user_id }}" {% if filters.user == user_id %}selected{% endif %}>{{ user_id }}</option>
+              {% endfor %}
+            </select>
+            <a class="reset-link" href="{{ url_for('history') }}">초기화</a>
+            <button class="search-button" type="submit">검색</button>
+          </form>
+
+          <section class="table-card">
+            {% if history_entries %}
+              <table>
+                <thead>
+                  <tr>
+                    <th class="col-no">순번</th>
+                    <th class="col-user">사용자 ID</th>
+                    <th>회의 제목</th>
+                    <th class="col-duration">회의 시간</th>
+                    <th class="col-time">생성된 시간</th>
+                    <th class="col-menu"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for item in history_entries %}
+                    <tr>
+                      <td class="col-no">{{ loop.index }}</td>
+                      <td class="col-user">{{ item.user_id }}</td>
+                      <td title="{{ item.title }}">{{ item.title }}</td>
+                      <td class="col-duration">{{ item.duration }}</td>
+                      <td class="col-time">{{ item.generated_at }}</td>
+                      <td class="col-menu">
+                        <details class="row-menu">
+                          <summary aria-label="기록 메뉴">⋮</summary>
+                          <div class="menu-popover">
+                            <form method="post" action="{{ url_for('delete_history', job_id=item.job_id) }}">
+                              <button class="delete-button" type="submit">기록 삭제</button>
+                            </form>
+                          </div>
+                        </details>
+                      </td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+              <div class="table-footer">
+                <span>1</span>
+                <span>총 {{ history_entries|length }}건</span>
+              </div>
+            {% else %}
+              <div class="empty">표시할 변환 기록이 없습니다.</div>
+            {% endif %}
+          </section>
+        {% else %}
+          <div class="hero">
+            <div class="wave" aria-hidden="true"></div>
+            <div class="hero-badge" aria-hidden="true"></div>
+            <div class="hero-mic" aria-hidden="true">M</div>
+            <h1>회의록 초안 생성 서버</h1>
+            <p>녹음 파일을 텍스트로 변환하고 사내 LLM으로 회의록 초안을 생성합니다.</p>
+          </div>
+
+          <form id="minutes-form" action="{{ url_for('index') }}" method="post" enctype="multipart/form-data" data-progress-template="{{ url_for('progress', job_id='__JOB_ID__') }}">
+            <input id="file" name="file" type="file" accept=".mp3,.m4a,.wav,.aac,.flac,.ogg,.mp4,.webm">
+
+            <section class="meeting-info-card">
+              <div class="meeting-info-header">
+                <div>
+                  <p class="meeting-info-title">회의 정보</p>
+                  <p class="meeting-info-desc">회의록 생성에 사용할 기본 정보를 입력한 뒤 저장하세요.</p>
+                </div>
+                <div class="meeting-info-actions">
+                  <button id="meeting-info-reset" class="reset-button compact" type="button">재설정</button>
+                  <button id="meeting-info-save" class="save-button compact" type="button">저장</button>
+                </div>
+              </div>
+              <div class="meeting-info-grid">
+                <label class="meeting-field">
+                  <span>회의명</span>
+                  <input id="meeting-title" type="text" maxlength="80" placeholder="회의명을 입력하세요">
+                </label>
+                <div class="participants-section">
+                  <div class="participants-header">
+                    <span>주요 참여 인원</span>
+                  </div>
+                  <div class="participants-table" id="participants-list" aria-label="주요 참여 인원 정보"></div>
+                  <button id="participant-add" class="participant-add" type="button" aria-label="참여 인원 추가">
+                    <span class="circle-symbol">+</span>
+                  </button>
+                </div>
+                <label class="meeting-field">
+                  <span>인원수</span>
+                  <input id="participant-count" type="number" min="1" max="99" step="1" inputmode="numeric" placeholder="99 이하">
+                </label>
+                <label class="meeting-field">
+                  <span>사용언어</span>
+                  <select id="meeting-language">
+                    <option value="ko" selected>한국어(KO)</option>
+                    <option value="en">영어(EN)</option>
+                  </select>
+                </label>
+                <div class="meeting-field toggle-field">
+                  <span class="label-with-help">
+                    보안 사업 여부
+                    <span class="info-tooltip" tabindex="0" aria-label="보안 사업 여부 설명">i
+                      <span class="tooltip-panel">켜면 DOCX 저장 후 해당 회의록 변환 중 outputs에 생성된 모든 작업 파일을 자동 삭제합니다.</span>
+                    </span>
+                  </span>
+                  <label class="toggle">
+                    <input id="meeting-secure-business" type="checkbox" {% if settings and settings.secure_business %}checked{% endif %}>
+                    <span class="toggle-label">ON</span>
+                    <span class="toggle-knob"></span>
+                  </label>
+                </div>
+              </div>
+              <p id="meeting-info-status" class="meeting-info-status">저장된 회의 정보가 없으면 기본값으로 처리됩니다.</p>
+            </section>
+
+            <div class="workflow">
+              <section class="card">
+                <div class="step">01</div>
+                <div class="visual mic"><div class="sound" aria-hidden="true"></div></div>
+                <h2>실시간 녹음 변환</h2>
+                <p>현재 PC의 마이크 녹음 데이터를 변환 대상으로 사용합니다.</p>
+                <div class="card-actions">
+                  <button id="record-start" class="primary" type="button">실시간 녹음 시작</button>
+                  <div class="record-row">
+                    <button id="record-pause" class="secondary" type="button" disabled>일시정지</button>
+                    <button id="record-stop" class="secondary" type="button" disabled>중지</button>
+                  </div>
+                </div>
+              </section>
+
+              <section class="card">
+                <div class="step">02</div>
+                <div class="visual"><div class="folder" aria-hidden="true"></div><div class="floating-action">↑</div></div>
+                <h2>녹음 파일 지정 변환</h2>
+                <p>저장된 녹음 파일을 선택해 변환 대상으로 사용합니다.</p>
+                <button id="dropzone" class="dropzone" type="button">
+                  파일 선택 또는 드래그
+                  <span id="selected-file" class="file-help">지원 형식 mp3, wav, m4a, webm</span>
+                </button>
+              </section>
+
+              <section class="card">
+                <div class="step">03</div>
+                <div class="visual"><div class="document" aria-hidden="true"></div><div class="floating-action">✓</div></div>
+                <h2>회의록 초안 생성</h2>
+                <p>변환된 텍스트를 기반으로 회의록 초안 DOCX를 생성합니다.</p>
+                <div class="card-actions">
+                  <button id="generate-docx" class="primary blue" type="submit">회의록 초안 생성</button>
+                </div>
+              </section>
+            </div>
+          </form>
+
+          <section class="progress-panel" aria-live="polite">
+            <div class="shield">i</div>
+            <div>
+              <p class="status-title">진행 내역</p>
+              <p id="record-status" class="status">대기 중입니다. 음성 파일을 선택하거나 녹음을 완료한 후 회의록 초안 생성을 눌러주세요.</p>
+              <ol id="progress-log" class="progress-log">
+                <li class="muted">아직 진행된 작업이 없습니다.</li>
+              </ol>
+            </div>
+            <div class="progress-actions">
+              <button id="save-docx" class="save-button compact hidden" type="button">DOCX 저장</button>
+            </div>
+          </section>
+
+          <section class="status-panel security-panel">
+            <div class="shield">✓</div>
+            <div>
+              <p class="status-title">보안 안내</p>
+              <p class="status">로컬 PC에서 STT 처리 후 transcript만 사내 LLM API로 전달합니다.</p>
+            </div>
+            <div></div>
+          </section>
+        {% endif %}
+      </section>
+    </main>
+  </div>
+
+  {% if page == 'home' %}
+    <script src="{{ url_for('static', filename='home.js') }}"></script>
+  {% elif page == 'settings' %}
+    <script src="{{ url_for('static', filename='settings.js') }}"></script>
+  {% endif %}
+</body>
+</html>

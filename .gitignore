@@ -1,0 +1,54 @@
+# Python environments and caches
+.venv*/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Downloaded runtime assets and binary distributions
+/models/
+/tools/
+/wheelhouse*/
+/source/models/
+/source/tools/
+/source/ffmpeg/
+*.whl
+*.exe
+*.dll
+*.bin
+*.pt
+*.pth
+*.onnx
+*.safetensors
+
+# Build and archive outputs
+/build/
+/dist/
+/dist_updated/
+*.spec.bak
+*.zip
+*.7z
+
+# Local settings, credentials and generated meeting data, at any depth
+app_settings.json
+conversion_history.json
+uploads/
+outputs/
+*.log
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+/upload_git/
+
+# Editor and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
